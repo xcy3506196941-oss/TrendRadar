@@ -204,7 +204,7 @@ jobs:
           fi
           rm -rf cloudflare_dist
           mkdir -p cloudflare_dist
-          cp index.html cloudflare_dist/index.html
+          cp output/html/latest/current.html cloudflare_dist/index.html
 
       - name: Deploy to Cloudflare Pages
         if: success() && steps.cf_check.outputs.enabled == 'true'
@@ -212,4 +212,4 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages deploy cloudflare_dist --project-name=${{ secrets.CLOUDFLARE_PROJECT_NAME }}
+          command: pages deploy cloudflare_dist --project-name=${{ secrets.CLOUDFLARE_PROJECT_NAME }} --branch=main
