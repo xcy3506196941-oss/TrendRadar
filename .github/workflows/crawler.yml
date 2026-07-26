@@ -149,20 +149,58 @@ jobs:
 
       - name: Prepare Cloudflare Pages assets
         if: success() && steps.cf_check.outputs.enabled == 'true'
+        id: prepare_cf
         run: |
-          REPORT_FILE="output/html/latest/current.html"
-          if [ ! -f "$REPORT_FILE" ]; then
-            echo "❌ 未找到 $REPORT_FILE"
-            find output -maxdepth 4 -type f | sort || true
-            exit 1
-          fi
-
           rm -rf cloudflare_dist
           mkdir -p cloudflare_dist
-          cp "$REPORT_FILE" cloudflare_dist/index.html
+
+          # 优先部署 TrendRadar 生成的网站首页及 HTML 报告目录
+          if [ -f "output/index.html" ]; then
+            echo "✅ 找到网站首页：output/index.html"
+            cp "output/index.html" "cloudflare_dist/index.html"
+
+            if [ -d "output/html" ]; then
+              cp -R "output/html" "cloudflare_dist/html"
+            fi
+
+            echo "has_report=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # 没有 output/index.html 时，尝试将最新报告作为网站首页
+          REPORT_FILE=""
+
+          for candidate in \
+            "output/html/latest/current.html" \
+            "output/html/latest/incremental.html" \
+            "output/html/latest/daily.html"; do
+            if [ -f "$candidate" ]; then
+              REPORT_FILE="$candidate"
+              break
+            fi
+          done
+
+          # 兼容其他目录结构：查找 output 下最新生成的 HTML
+          if [ -z "$REPORT_FILE" ]; then
+            REPORT_FILE=$(find output -type f -name "*.html" -printf '%T@ %p\n' 2>/dev/null \
+              | sort -nr \
+              | head -n 1 \
+              | cut -d' ' -f2-)
+          fi
+
+          if [ -z "$REPORT_FILE" ] || [ ! -f "$REPORT_FILE" ]; then
+            echo "ℹ️ 本次没有生成 HTML 报告，跳过 Cloudflare Pages 部署"
+            echo "has_report=false" >> "$GITHUB_OUTPUT"
+            find output -maxdepth 5 -type f | sort || true
+            exit 0
+          fi
+
+          echo "✅ 找到报告文件：$REPORT_FILE"
+          cp "$REPORT_FILE" "cloudflare_dist/index.html"
+          echo "has_report=true" >> "$GITHUB_OUTPUT"
 
       - name: Deploy to Cloudflare Pages
-        if: success() && steps.cf_check.outputs.enabled == 'true'
+        if: success() && steps.cf_check.outputs.enabled == 'true' && steps.prepare_cf.outputs.has_report == 'true'
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
