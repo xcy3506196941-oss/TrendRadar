@@ -29,6 +29,7 @@ class AIClient:
                 - TIMEOUT: 请求超时时间（秒）
                 - NUM_RETRIES: 重试次数（可选）
                 - FALLBACK_MODELS: 备用模型列表（可选）
+                - EXTRA_PARAMS: 额外请求参数（可选）
         """
         self.model = config.get("MODEL", "deepseek/deepseek-chat")
         self.api_key = config.get("API_KEY") or os.environ.get("AI_API_KEY", "")
@@ -38,6 +39,7 @@ class AIClient:
         self.timeout = config.get("TIMEOUT", 120)
         self.num_retries = config.get("NUM_RETRIES", 2)
         self.fallback_models = config.get("FALLBACK_MODELS", [])
+        self.extra_params = config.get("EXTRA_PARAMS", {})
 
     def chat(
         self,
@@ -57,7 +59,6 @@ class AIClient:
         Raises:
             Exception: API 调用失败时抛出异常
         """
-        # 构建请求参数
         params = {
             "model": self.model,
             "messages": messages,
@@ -66,33 +67,33 @@ class AIClient:
             "num_retries": kwargs.get("num_retries", self.num_retries),
         }
 
-        # 添加 API Key
         if self.api_key:
             params["api_key"] = self.api_key
 
-        # 添加 API Base（如果配置了）
         if self.api_base:
             params["api_base"] = self.api_base
 
-        # 添加 max_tokens（如果配置了且不为 0）
         max_tokens = kwargs.get("max_tokens", self.max_tokens)
         if max_tokens and max_tokens > 0:
             params["max_tokens"] = max_tokens
 
-        # 添加 fallback 模型（如果配置了）
         if self.fallback_models:
             params["fallbacks"] = self.fallback_models
 
-        # 合并其他额外参数
+        # 合并 config.yaml 中的额外参数，例如：
+        # extra_body:
+        #   enable_thinking: false
+        for key, value in self.extra_params.items():
+            if key not in params:
+                params[key] = value
+
+        # 运行时 kwargs 优先级最高
         for key, value in kwargs.items():
             if key not in params:
                 params[key] = value
 
-        # 调用 LiteLLM
         response = completion(**params)
 
-        # 提取响应内容
-        # 某些模型/提供商返回 list（内容块）而非 str，统一转为 str
         content = response.choices[0].message.content
         if isinstance(content, list):
             content = "\n".join(
@@ -102,20 +103,17 @@ class AIClient:
         return content or ""
 
     def validate_config(self) -> tuple[bool, str]:
-        """
-        验证配置是否有效
-
-        Returns:
-            tuple: (是否有效, 错误信息)
-        """
+        """验证配置是否有效。"""
         if not self.model:
             return False, "未配置 AI 模型（model）"
 
         if not self.api_key:
             return False, "未配置 AI API Key，请在 config.yaml 或环境变量 AI_API_KEY 中设置"
 
-        # 验证模型格式（应该包含 provider/model）
         if "/" not in self.model:
-            return False, f"模型格式错误: {self.model}，应为 'provider/model' 格式（如 'deepseek/deepseek-chat'）"
+            return False, (
+                f"模型格式错误: {self.model}，"
+                "应为 'provider/model' 格式（如 'openai/qwen3.7-plus'）"
+            )
 
         return True, ""
