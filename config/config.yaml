@@ -380,7 +380,7 @@ ai:
   model: "openai/qwen3.7-plus"
 
   api_key: ""                       # API Key（建议使用环境变量 AI_API_KEY）
-  api_base: "https://dashscope.aliyuncs.com/compatible-mode/v1" # 自定义 API 地址（可选，绝大多数情况留空即可）
+  api_base: "https://ws-cz81ro9o1ywvei0f.cn-beijing.maas.aliyuncs.com/compatible-mode/v1" # 自定义 API 地址（可选，绝大多数情况留空即可）
                                     #
                                     # ❓ 什么时候需要填？
                                     #    当你使用的 AI 服务商不在上方支持列表中时。
